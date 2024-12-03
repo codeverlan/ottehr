@@ -1,4 +1,4 @@
-import { Button, Typography } from '@mui/material';
+import { Typography } from '@mui/material';
 import { Box } from '@mui/system';
 import { DateTime } from 'luxon';
 import { useEffect, useState } from 'react';
@@ -12,6 +12,11 @@ import { useZapEHRAPIClient } from '../utils';
 import Schedule from '../components/Schedule';
 import { ErrorDialog } from 'ottehr-components';
 import { useAuth0 } from '@auth0/auth0-react';
+import { useGetPatients, usePatientsStore } from 'src/features/patients';
+import { useFilesStore } from 'src/features/files';
+import { usePaperworkStore } from 'src/features/paperwork';
+import { usePatientInfoStore } from 'src/features/patient-info';
+import LoadingButton from '@mui/lab/LoadingButton';
 
 interface Parameters {
   'schedule-type': 'location' | 'provider';
@@ -48,18 +53,49 @@ const Welcome = (): JSX.Element => {
   }, [visitService, setAppointment, visitType, scheduleType]);
 
   useEffect(() => {
-    setAppointment({ locationID: schedule?.locationID, providerID: schedule?.providerID, groupID: schedule?.groupID });
-  }, [schedule?.groupID, schedule?.locationID, schedule?.providerID, setAppointment]);
+    setAppointment({
+      locationID: schedule?.locationID,
+      providerID: schedule?.providerID,
+      groupID: schedule?.groupID,
+      slug,
+    });
+  }, [schedule?.groupID, schedule?.locationID, schedule?.providerID, setAppointment, slug]);
 
-  const onSubmit = (): void => {
+  const clearState = (): void => {
+    useAppointmentStore.setState({ appointmentID: undefined, appointmentDate: undefined });
+    usePaperworkStore.setState({ paperworkQuestions: undefined, completedPaperwork: undefined });
+    usePatientInfoStore.getState().setNewPatient();
+    useFilesStore.setState({ fileURLs: undefined });
+  };
+
+  const { refetch: refetchPatients, isFetching: isPatientsFetching } = useGetPatients(apiClient, (data) => {
+    usePatientsStore.setState({ patients: data?.patients });
+  });
+
+  const onSubmit = async (): Promise<void> => {
     if (!selectedSlot) {
       setChoiceErrorDialogOpen(true);
-    } else if (!isAuthenticated) {
-      localStorage.setItem('welcomePath', location.pathname);
+      return;
+    }
+
+    localStorage.setItem('welcomePath', location.pathname);
+
+    if (!isAuthenticated) {
       navigate(IntakeFlowPageRoute.AuthPage.path);
-    } else {
-      localStorage.setItem('welcomePath', location.pathname);
-      navigate(`${IntakeFlowPageRoute.SelectPatient.path}?flow=requestVisit`);
+      return;
+    }
+
+    try {
+      const { data } = await refetchPatients();
+
+      if (!data?.patients?.length) {
+        clearState();
+        navigate(IntakeFlowPageRoute.PatientInformation.path);
+      } else {
+        navigate(`${IntakeFlowPageRoute.SelectPatient.path}?flow=requestVisit`);
+      }
+    } catch (error) {
+      console.error('Error fetching patients:', error);
     }
   };
 
@@ -91,7 +127,8 @@ const Welcome = (): JSX.Element => {
 
           {visitType === 'prebook' && <Schedule slotData={schedule.availableSlots} timezone={'America/New_York'} />}
           <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Button
+            <LoadingButton
+              loading={isPatientsFetching}
               variant="contained"
               color="secondary"
               size="large"
@@ -103,7 +140,7 @@ const Welcome = (): JSX.Element => {
               onClick={onSubmit}
             >
               {t('general.button.continue')}
-            </Button>
+            </LoadingButton>
           </Box>
         </>
       )}

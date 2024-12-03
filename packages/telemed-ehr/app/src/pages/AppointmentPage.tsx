@@ -1,13 +1,8 @@
 import { Box, Container } from '@mui/material';
 import { FC, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import {
-  AppointmentFooter,
-  AppointmentHeader,
-  AppointmentSidePanel,
-  AppointmentTabs,
-  AppointmentTabsHeader,
-} from '../telemed/features/appointment';
+import { AppointmentHeader, AppointmentTabs, AppointmentTabsHeader } from '../telemed/features/appointment';
+import { AppointmentSidePanel } from '../telemed/features/appointment';
 import { PATIENT_PHOTO_CODE, getQuestionnaireResponseByLinkId } from 'ehr-utils';
 import {
   useAppointmentStore,
@@ -93,10 +88,10 @@ export const AppointmentPage: FC = () => {
         minHeight: '100vh',
       }}
     >
-      <AppointmentHeader onClose={() => navigate('/')} />
+      <AppointmentHeader onClose={() => navigate('/visits')} />
 
       <Box sx={{ display: 'flex', flex: 1, width: '100%' }}>
-        <AppointmentSidePanel />
+        <AppointmentSidePanel appointmentType="in-person" />
 
         <Container maxWidth="xl" sx={{ my: 3 }}>
           <AppointmentTabs />

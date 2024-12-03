@@ -25,7 +25,7 @@ import { DateTime } from 'luxon';
 import { useEffect, useState } from 'react';
 import { PatternFormat } from 'react-number-format';
 import { useNavigate } from 'react-router-dom';
-import { GetLocationParameters, GetLocationResponse, createAppointment, getLocations } from '../api/api';
+import { GetScheduleParameters, GetScheduleResponse, createAppointment, getSchedule } from '../api/api';
 import CustomBreadcrumbs from '../components/CustomBreadcrumbs';
 import { CustomDialog } from '../components/dialogs/CustomDialog';
 import DateSearch from '../components/DateSearch';
@@ -55,13 +55,14 @@ export default function AddPatient(): JSX.Element {
   const [slot, setSlot] = useState<string | undefined>();
   const [loading, setLoading] = useState<boolean>(false);
   const [searching, setSearching] = useState<boolean>(false);
-  const [errors, setErrors] = useState<{ submit?: boolean; phone?: boolean; search?: boolean }>({
+  const [errors, setErrors] = useState<{ age?: boolean; submit?: boolean; phone?: boolean; search?: boolean }>({
+    age: false,
     submit: false,
     phone: false,
     search: false,
   });
   const [loadingSlotState, setLoadingSlotState] = useState<SlotLoadingState>({ status: 'initial', input: undefined });
-  const [locationWithSlotData, setLocationWithSlotData] = useState<GetLocationResponse | undefined>(undefined);
+  const [locationWithSlotData, setLocationWithSlotData] = useState<GetScheduleResponse | undefined>(undefined);
   const [inputValue, setInputValue] = useState<string>('');
   const [validDate, setValidDate] = useState<boolean>(true);
   const [selectSlotDialogOpen, setSelectSlotDialogOpen] = useState<boolean>(false);
@@ -87,12 +88,12 @@ export default function AddPatient(): JSX.Element {
   };
 
   useEffect(() => {
-    const fetchLocationWithSlotData = async (params: GetLocationParameters, client: ZambdaClient): Promise<void> => {
+    const fetchLocationWithSlotData = async (params: GetScheduleParameters, client: ZambdaClient): Promise<void> => {
       setLoadingSlotState({ status: 'loading', input: undefined });
       try {
         if (!zambdaIntakeClient) throw new Error('Zambda client not found');
-        const locationResponse = await getLocations(zambdaIntakeClient, params);
-        setLocationWithSlotData(locationResponse);
+        const scheduleResponse = await getSchedule(zambdaIntakeClient, { scheduleType: 'location', slug: params.slug });
+        setLocationWithSlotData(scheduleResponse);
       } catch (e) {
         console.error('error loading location with slot data', e);
       } finally {
@@ -200,10 +201,14 @@ export default function AddPatient(): JSX.Element {
         apiErr = true;
       } finally {
         setLoading(false);
-        if (response && !apiErr) {
+        if (!response.error && !apiErr) {
           navigate('/visits');
         } else {
-          setErrors({ submit: true });
+          if (response.error.includes('Patient age must be between')) {
+            setErrors({ age: true });
+          } else {
+            setErrors({ submit: true });
+          }
         }
       }
     }
@@ -528,6 +533,7 @@ export default function AddPatient(): JSX.Element {
                         <Grid container direction="row" justifyContent="space-between">
                           <Grid item xs={12}>
                             <TextField
+                              required
                               label="Email"
                               variant="outlined"
                               fullWidth
@@ -639,7 +645,7 @@ export default function AddPatient(): JSX.Element {
                 )}
 
                 {/* form buttons */}
-                <Box marginTop={4}>
+                <Box marginTop={2}>
                   {errors.submit && (
                     <Typography color="error" variant="body2" mb={2}>
                       Failed to add patient. Please try again.
@@ -648,6 +654,11 @@ export default function AddPatient(): JSX.Element {
                   {errors.search && (
                     <Typography color="error" variant="body2" mb={2}>
                       Please search for patients before adding
+                    </Typography>
+                  )}
+                  {errors.age && (
+                    <Typography color="error" variant="body2" mb={2}>
+                      Patient age must be between 0 and 120 years
                     </Typography>
                   )}
                   <LoadingButton

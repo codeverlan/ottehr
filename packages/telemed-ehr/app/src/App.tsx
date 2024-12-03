@@ -57,11 +57,14 @@ function App(): ReactElement {
   const wasEnrolledInERX = useProviderERXStateStore((state) => state.wasEnrolledInERX);
 
   const roleUnknown =
-    !currentUser || !currentUser.hasRole([RoleType.Administrator, RoleType.Staff, RoleType.Manager, RoleType.Provider]);
-
-  console.log(
-    `Photon Client: ${import.meta.env.VITE_APP_PHOTON_CLIENT_ID}, Photon Org: ${import.meta.env.VITE_APP_PHOTON_ORG_ID}`,
-  );
+    !currentUser ||
+    !currentUser.hasRole([
+      RoleType.Administrator,
+      RoleType.Staff,
+      RoleType.Manager,
+      RoleType.Provider,
+      RoleType.Prescriber,
+    ]);
 
   return (
     <CustomThemeProvider>
@@ -77,7 +80,7 @@ function App(): ReactElement {
                   showWhenAuthenticated={
                     <>
                       {isERXEnabled &&
-                      ((currentUser?.hasRole([RoleType.Provider]) && currentUser.isPractitionerEnrolledInERX) ||
+                      ((currentUser?.hasRole([RoleType.Prescriber]) && currentUser.isPractitionerEnrolledInERX) ||
                         wasEnrolledInERX) ? (
                         <photon-client
                           id={import.meta.env.VITE_APP_PHOTON_CLIENT_ID}
@@ -85,6 +88,7 @@ function App(): ReactElement {
                           dev-mode="true"
                           auto-login="true"
                           redirect-uri={window.location.origin}
+                          // connection={import.meta.env.VITE_APP_PHOTON_CONNECTION_NAME}
                         >
                           <Outlet />
                         </photon-client>

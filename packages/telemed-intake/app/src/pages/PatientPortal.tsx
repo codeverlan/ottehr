@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { IntakeFlowPageRoute } from '../App';
 import { otherColors } from '../IntakeThemeProvider';
-import { useGetAppointments } from '../features/appointments';
 import { CustomContainer, useIntakeCommonStore } from '../features/common';
 import HomepageOption from '../features/homepage/HomepageOption';
 import { useZapEHRAPIClient } from '../utils';
 import { requestVisit, pastVisits, contactSupport } from '@theme/icons';
+import { useGetPatients, usePatientsStore } from 'src/features/patients';
+import { useGetAppointments } from 'src/features/appointments';
 
 const PatientPortal = (): JSX.Element => {
   localStorage.removeItem('welcomePath');
@@ -19,6 +20,12 @@ const PatientPortal = (): JSX.Element => {
   const activeAppointment = appointmentsData?.appointments.find((appointment) =>
     ['ready', 'pre-video', 'on-video'].includes(appointment.telemedStatus),
   );
+
+  const { data: patientsData, isFetching: isPatientsFetching } = useGetPatients(apiClient, (data) => {
+    usePatientsStore.setState({ patients: data?.patients });
+  });
+
+  const hasPatients = Boolean(patientsData?.patients?.length);
 
   const isAppointmentStatusReady = Boolean(activeAppointment);
 
@@ -35,7 +42,7 @@ const PatientPortal = (): JSX.Element => {
       bgVariant={IntakeFlowPageRoute.PatientPortal.path}
       isFirstPage={true}
     >
-      {isFetching ? (
+      {isFetching || isPatientsFetching ? (
         <Skeleton
           sx={{
             borderRadius: 2,
@@ -80,16 +87,18 @@ const PatientPortal = (): JSX.Element => {
             <HomepageOption title={t('patientPortal.requestVisit')} icon={requestVisit} />
           </Link>
 
-          <Link
-            to={`${IntakeFlowPageRoute.SelectPatient.path}?flow=pastVisits`}
-            style={{ textDecoration: 'none', color: 'var(--text-primary)' }}
-          >
-            <HomepageOption
-              title={t('patientPortal.pastVisits')}
-              icon={pastVisits}
-              subtitle={t('patientPortal.pastVisitsSubtitle')}
-            />
-          </Link>
+          {hasPatients && (
+            <Link
+              to={`${IntakeFlowPageRoute.SelectPatient.path}?flow=pastVisits`}
+              style={{ textDecoration: 'none', color: 'var(--text-primary)' }}
+            >
+              <HomepageOption
+                title={t('patientPortal.pastVisits')}
+                icon={pastVisits}
+                subtitle={t('patientPortal.pastVisitsSubtitle')}
+              />
+            </Link>
+          )}
         </>
       )}
       <HomepageOption

@@ -68,6 +68,12 @@ export const index = async (input: ZambdaInput): Promise<APIGatewayProxyResult> 
     return response;
   } catch (error: any) {
     await topLevelCatch('create-appointment', error, input.secrets);
+    if (error.message.includes(`age not inside range of ${MINIMUM_AGE} to ${MAXIMUM_AGE}`)) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: `Patient age must be between ${MINIMUM_AGE} and ${MAXIMUM_AGE} years` }),
+      };
+    }
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'Internal error' }),
@@ -98,7 +104,6 @@ async function performEffect(props: PerformEffectInputProps): Promise<APIGateway
   } = params;
   const { secrets } = input;
   const fhirClient = createFhirClient(zapehrToken);
-  console.log('getting user');
 
   const user = await getUser(input.headers.Authorization.replace('Bearer ', ''));
   const isEHRUser = !user.name.startsWith('+');
@@ -163,8 +168,6 @@ export async function createAppointment(
   isDemo?: boolean,
   phoneNumber?: string,
 ): Promise<CreateAppointmentUCTelemedResponse> {
-  const ENVIRONMENT = getSecret(SecretsKeys.ENVIRONMENT, secrets);
-
   let maybeFhirPatient: Patient | undefined = undefined;
   let updatePatientRequest: BatchInputRequest | undefined = undefined;
   let createPatientRequest: BatchInputPostRequest | undefined = undefined;
@@ -198,7 +201,7 @@ export async function createAppointment(
   }
 
   /** !!! Start time should be the appointment creation time here,
-   * cause the "Estimated waiting time" calulations are based on this,
+   * cause the "Estimated waiting time" calculations are based on this,
    * and we can't search appointments by "created" prop
    **/
   const originalDate = DateTime.fromISO(slot);
@@ -521,7 +524,7 @@ export const performTransactionalFhirRequests = async (input: TransactionInput):
   const apptResource: Appointment = {
     resourceType: 'Appointment',
     meta: {
-      tag: [{ code: OTTEHR_MODULE.TM }],
+      tag: [{ code: visitService === 'in-person' ? OTTEHR_MODULE.UC : OTTEHR_MODULE.TM }],
     },
     participant: participants,
     start: startTimeToISO,

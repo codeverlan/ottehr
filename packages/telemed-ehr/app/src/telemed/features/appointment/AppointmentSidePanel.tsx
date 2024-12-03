@@ -19,7 +19,7 @@ import {
   useTheme,
 } from '@mui/material';
 import { DateTime } from 'luxon';
-import { FC, useCallback, useState } from 'react';
+import { FC, useCallback, useEffect, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   getQuestionnaireResponseByLinkId,
@@ -27,6 +27,8 @@ import {
   ApptStatus,
   AppointmentMessaging,
   UCAppointmentInformation,
+  QuestionnaireLinkIds,
+  getStatusFromExtension,
 } from 'ehr-utils';
 import ChatModal from '../../../features/chat/ChatModal';
 import { calculatePatientAge } from '../../../helpers/formatDateTime';
@@ -36,12 +38,16 @@ import CancelVisitDialog from '../../components/CancelVisitDialog';
 import EditPatientDialog from '../../components/EditPatientDialog';
 import InviteParticipant from '../../components/InviteParticipant';
 import { useGetAppointmentAccessibility } from '../../hooks';
-import { useAppointmentStore } from '../../state';
-import { getAppointmentStatusChip, getPatientName } from '../../utils';
+import { useAppointmentStore, useGetTelemedAppointmentWithSMSModel } from '../../state';
+import { getPatientName, quickTexts } from '../../utils';
 // import { ERX } from './ERX';
 import { PastVisits } from './PastVisits';
 import { addSpacesAfterCommas } from '../../../helpers/formatString';
 import { INTERPRETER_PHONE_NUMBER } from 'ehr-utils';
+import { Appointment } from 'fhir/r4';
+import AppointmentStatusSwitcher from '../../../components/AppointmentStatusSwitcher';
+import { getTelemedAppointmentStatusChip } from '../../utils/getTelemedAppointmentStatusChip';
+import { getInPersonAppointmentStatusChip } from '../../../components/AppointmentTableRow';
 
 enum Gender {
   'male' = 'Male',
@@ -50,7 +56,22 @@ enum Gender {
   'unknown' = 'Unknown',
 }
 
-export const AppointmentSidePanel: FC = () => {
+interface AppointmentSidePanelProps {
+  appointmentType: 'telemedicine' | 'in-person';
+}
+
+const isInPersonStatusCancelable = (status: string | undefined): boolean => {
+  if (!status) {
+    return false;
+  }
+  return status === 'proposed' || status === 'pending' || status === 'booked' || status === 'arrived';
+};
+
+const isTelemedStatusCancelable = (status: ApptStatus): boolean => {
+  return status !== ApptStatus.complete && status !== ApptStatus.cancelled && status !== ApptStatus.unsigned;
+};
+
+export const AppointmentSidePanel: FC<AppointmentSidePanelProps> = ({ appointmentType }) => {
   const theme = useTheme();
 
   const { appointment, encounter, patient, location, isReadOnly, questionnaireResponse } = getSelectors(
@@ -67,37 +88,62 @@ export const AppointmentSidePanel: FC = () => {
   const [chatModalOpen, setChatModalOpen] = useState<boolean>(false);
   const [isInviteParticipantOpen, setIsInviteParticipantOpen] = useState(false);
 
-  const reasonForVisit = getQuestionnaireResponseByLinkId('reason-for-visit', questionnaireResponse)?.answer?.[0]
-    .valueString;
-  const preferredLanguage = getQuestionnaireResponseByLinkId('preferred-language', questionnaireResponse)?.answer?.[0]
-    .valueString;
-  const relayPhone = getQuestionnaireResponseByLinkId('relay-phone', questionnaireResponse)?.answer?.[0].valueString;
+  const reasonForVisit = getQuestionnaireResponseByLinkId(QuestionnaireLinkIds.REASON_FOR_VISIT, questionnaireResponse)
+    ?.answer?.[0].valueString;
+  const preferredLanguage = getQuestionnaireResponseByLinkId(
+    QuestionnaireLinkIds.PREFERRED_LANGUAGE,
+    questionnaireResponse,
+  )?.answer?.[0].valueString;
+  const relayPhone = getQuestionnaireResponseByLinkId(QuestionnaireLinkIds.RELAY_PHONE, questionnaireResponse)
+    ?.answer?.[0].valueString;
   const number =
-    getQuestionnaireResponseByLinkId('patient-number', questionnaireResponse)?.answer?.[0].valueString ||
-    getQuestionnaireResponseByLinkId('guardian-number', questionnaireResponse)?.answer?.[0].valueString;
-  const knownAllergies = getQuestionnaireResponseByLinkId('allergies', questionnaireResponse)?.answer[0].valueArray;
-  const address = getQuestionnaireResponseByLinkId('patient-street-address', questionnaireResponse)?.answer?.[0]
-    .valueString;
+    getQuestionnaireResponseByLinkId(QuestionnaireLinkIds.PATIENT_NUMBER, questionnaireResponse)?.answer?.[0]
+      .valueString ||
+    getQuestionnaireResponseByLinkId(QuestionnaireLinkIds.GUARDIAN_NUMBER, questionnaireResponse)?.answer?.[0]
+      .valueString;
+  const knownAllergies = getQuestionnaireResponseByLinkId(QuestionnaireLinkIds.ALLERGIES, questionnaireResponse)
+    ?.answer[0].valueArray;
+  const address = getQuestionnaireResponseByLinkId(QuestionnaireLinkIds.PATIENT_STREET_ADDRESS, questionnaireResponse)
+    ?.answer?.[0].valueString;
 
   const handleERXLoadingStatusChange = useCallback<(status: boolean) => void>(
     (status) => setIsERXLoading(status),
     [setIsERXLoading],
   );
-  const appointmentAccessibility = useGetAppointmentAccessibility();
 
-  const isCancellableStatus =
-    appointmentAccessibility.status !== ApptStatus.complete &&
-    appointmentAccessibility.status !== ApptStatus.cancelled &&
-    appointmentAccessibility.status !== ApptStatus.unsigned;
+  const appointmentAccessibility = useGetAppointmentAccessibility(appointmentType);
 
-  const isPractitionerAllowedToCancelThisVisit =
+  let isCancellableStatus =
+    appointmentType === 'telemedicine'
+      ? isTelemedStatusCancelable(appointmentAccessibility.status as ApptStatus)
+      : isInPersonStatusCancelable(appointmentAccessibility.status as string);
+
+  const [isPractitionerAllowedToCancelThisVisit, setIsPractitionerAllowedToCancelThisVisit] = useState<boolean>(
     // appointmentAccessibility.isPractitionerLicensedInState &&
     // appointmentAccessibility.isEncounterAssignedToCurrentPractitioner &&
-    isCancellableStatus;
-
-  const [hasUnread, setHasUnread] = useState<boolean>(
-    (appointment as unknown as UCAppointmentInformation)?.smsModel?.hasUnreadMessages || false,
+    isCancellableStatus || false,
   );
+
+  const onStatusChange = (status: string): void => {
+    isCancellableStatus = isInPersonStatusCancelable(status);
+    setIsPractitionerAllowedToCancelThisVisit(isCancellableStatus);
+  };
+
+  useEffect(() => {
+    setIsPractitionerAllowedToCancelThisVisit(isCancellableStatus);
+  }, [isCancellableStatus]);
+
+  const { data: appointmentMessaging, isFetching } = useGetTelemedAppointmentWithSMSModel(
+    {
+      appointmentId: appointment?.id,
+      patientId: patient?.id,
+    },
+    (data) => {
+      setHasUnread(data.smsModel?.hasUnreadMessages || false);
+    },
+  );
+
+  const [hasUnread, setHasUnread] = useState<boolean>(appointmentMessaging?.smsModel?.hasUnreadMessages || false);
 
   if (!patient) {
     return null;
@@ -139,7 +185,8 @@ export const AppointmentSidePanel: FC = () => {
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 3, overflow: 'auto' }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-            {getAppointmentStatusChip(mapStatusToTelemed(encounter.status, appointment?.status))}
+            {appointmentType === 'telemedicine' &&
+              getTelemedAppointmentStatusChip(mapStatusToTelemed(encounter.status, appointment?.status))}
 
             {appointment?.id && (
               <Tooltip title={appointment.id}>
@@ -156,6 +203,18 @@ export const AppointmentSidePanel: FC = () => {
               </Tooltip>
             )}
           </Box>
+
+          {appointmentType === 'in-person' && appointmentAccessibility.isStatusEditable && (
+            <AppointmentStatusSwitcher
+              appointment={appointment as Appointment}
+              encounter={encounter}
+              onStatusChange={onStatusChange}
+            />
+          )}
+          {appointmentType === 'in-person' &&
+            !appointmentAccessibility.isStatusEditable &&
+            !!appointment &&
+            getInPersonAppointmentStatusChip(getStatusFromExtension(appointment as Appointment) as ApptStatus)}
 
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography variant="h4" color="primary.dark">
@@ -250,6 +309,7 @@ export const AppointmentSidePanel: FC = () => {
               )
             }
             onClick={() => setChatModalOpen(true)}
+            loading={isFetching && !appointmentMessaging}
           />
 
           <Button
@@ -317,8 +377,11 @@ export const AppointmentSidePanel: FC = () => {
         </Box>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'start' }}>
-          {appointmentAccessibility.status &&
-            [ApptStatus['pre-video'], ApptStatus['on-video']].includes(appointmentAccessibility.status) && (
+          {appointmentType === 'telemedicine' &&
+            appointmentAccessibility.status &&
+            [ApptStatus['pre-video'], ApptStatus['on-video']].includes(
+              appointmentAccessibility.status as ApptStatus,
+            ) && (
               <Button
                 size="small"
                 sx={{
@@ -351,17 +414,20 @@ export const AppointmentSidePanel: FC = () => {
           )}
         </Box>
 
-        {isCancelDialogOpen && <CancelVisitDialog onClose={() => setIsCancelDialogOpen(false)} />}
+        {isCancelDialogOpen && (
+          <CancelVisitDialog onClose={() => setIsCancelDialogOpen(false)} appointmentType={appointmentType} />
+        )}
         {/* {isERXOpen && <ERX onClose={() => setIsERXOpen(false)} onLoadingStatusChange={handleERXLoadingStatusChange} />} */}
         {isEditDialogOpen && (
           <EditPatientDialog modalOpen={isEditDialogOpen} onClose={() => setIsEditDialogOpen(false)} />
         )}
-        {chatModalOpen && (
+        {chatModalOpen && appointmentMessaging && (
           <ChatModal
-            appointment={appointment as unknown as UCAppointmentInformation}
-            currentLocation={location}
+            appointment={appointmentMessaging}
             onClose={() => setChatModalOpen(false)}
             onMarkAllRead={() => setHasUnread(false)}
+            patient={patient}
+            quickTexts={quickTexts}
           />
         )}
         {isInviteParticipantOpen && (

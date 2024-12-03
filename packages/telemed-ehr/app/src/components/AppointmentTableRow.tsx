@@ -45,6 +45,7 @@ import { ApptTab } from './AppointmentTabs';
 import CustomChip from './CustomChip';
 import { GenericToolTip, PaperworkToolTipContent } from './GenericToolTip';
 import { VisitStatus, StatusLabel } from '../helpers/mappingUtils';
+import { quickTexts } from '../telemed/utils';
 
 interface AppointmentTableProps {
   appointment: UCAppointmentInformation;
@@ -64,7 +65,7 @@ const FLAGGED_REASONS_FOR_VISIT: string[] = [
   'Allergic reaction',
 ];
 
-export function getAppointmentStatusChip(status: string, count?: number): ReactElement {
+export function getInPersonAppointmentStatusChip(status: string, count?: number): ReactElement {
   if (!status) {
     return <span>todo1</span>;
   }
@@ -133,7 +134,7 @@ export const CHIP_STATUS_MAP: {
       primary: '#684e5d',
     },
   },
-  'provider-ready': {
+  'ready for provider': {
     background: {
       primary: '#EEEEEE',
       secondary: '#444444',
@@ -150,7 +151,7 @@ export const CHIP_STATUS_MAP: {
       primary: '#6F6D1A',
     },
   },
-  discharge: {
+  'ready for discharge': {
     background: {
       primary: '#B2EBF2',
     },
@@ -158,7 +159,7 @@ export const CHIP_STATUS_MAP: {
       primary: '#006064',
     },
   },
-  'checked-out': {
+  'checked out': {
     background: {
       primary: '#FFFFFF',
     },
@@ -174,7 +175,7 @@ export const CHIP_STATUS_MAP: {
       primary: '#B71C1C',
     },
   },
-  'no-show': {
+  'no show': {
     background: {
       primary: '#DFE5E9',
     },
@@ -443,9 +444,9 @@ export default function AppointmentTableRow({
         }}
       >
         {isLongWaitingTime && longWaitFlag}
-        {getStatiForVisitTimeCalculation(appointment.visitStatusHistory, appointment.start).map((statusTemp) => {
+        {getStatiForVisitTimeCalculation(appointment.visitStatusHistory, appointment.start).map((statusTemp, index) => {
           return (
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            <Box key={index} sx={{ display: 'flex', gap: 1 }}>
               <Typography
                 variant="body2"
                 color={theme.palette.getContrastText(theme.palette.background.default)}
@@ -453,7 +454,7 @@ export default function AppointmentTableRow({
               >
                 {formatMinutes(getDurationOfStatus(statusTemp, appointment, appointment.visitStatusHistory, now))} mins
               </Typography>
-              {getAppointmentStatusChip(statusTemp.label as keyof typeof CHIP_STATUS_MAP)}
+              {getInPersonAppointmentStatusChip(statusTemp.label as keyof typeof CHIP_STATUS_MAP)}
             </Box>
           );
         })}
@@ -528,7 +529,7 @@ export default function AppointmentTableRow({
                 &nbsp;&nbsp;<strong>{start}</strong>
               </Typography>
             </Box>
-            <Box mt={1}>{getAppointmentStatusChip(appointment.status)}</Box>
+            <Box mt={1}>{getInPersonAppointmentStatusChip(appointment.status)}</Box>
           </Link>
         </Box>
       </TableCell>
@@ -795,6 +796,7 @@ export default function AppointmentTableRow({
           currentLocation={location}
           onClose={() => setChatModalOpen(false)}
           onMarkAllRead={() => setHasUnread(false)}
+          quickTexts={quickTexts}
         />
       )}
     </TableRow>

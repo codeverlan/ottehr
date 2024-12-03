@@ -6,7 +6,7 @@ import config from '../../../vite.config';
 export default (env) => {
   const { mode } = env;
   const envDir = './env';
-  const appEnv = loadEnv(mode, path.join(process.cwd(), envDir), '');
+  const appEnv = loadEnv(mode, path.join(process.cwd(), envDir));
 
   const shouldUploadSentrySourceMaps =
     mode === 'testing' || mode === 'staging' || mode === 'dev' || mode === 'production' || mode === 'training';
@@ -53,6 +53,9 @@ export default (env) => {
         open: 'patient-portal',
       },
       plugins,
+      define: {
+        global: 'window',
+      },
     }),
   );
 };

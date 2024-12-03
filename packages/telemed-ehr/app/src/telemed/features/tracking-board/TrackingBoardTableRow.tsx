@@ -21,6 +21,7 @@ import ChatModal from '../../../features/chat/ChatModal';
 import { calculatePatientAge, formatDateUsingSlashes } from '../../../helpers/formatDateTime';
 import { AppointmentStatusChip, StatusHistory } from '../../components';
 import { TrackingBoardTableButton } from './TrackingBoardTableButton';
+import { quickTexts } from '../../utils';
 
 interface AppointmentTableProps {
   appointment: TelemedAppointmentInformation;
@@ -140,9 +141,6 @@ export function TrackingBoardTableRow({
         <StatusHistory history={appointment.telemedStatusHistory} currentStatus={appointment.telemedStatus} />
       </TableCell>
       <TableCell sx={{ verticalAlign: 'top' }}>
-        <Typography>{appointment.provider?.join(', ')}</Typography>
-      </TableCell>
-      <TableCell sx={{ verticalAlign: 'top' }}>
         <Typography>{appointment.group?.join(', ')}</Typography>
       </TableCell>
       {showEstimated && (
@@ -179,11 +177,13 @@ export function TrackingBoardTableRow({
           </Typography>
         </Tooltip>
       </TableCell>
+
       {showProvider && (
         <TableCell sx={{ verticalAlign: 'top' }}>
-          <Box>Dr. Smith</Box>
+          <Box>{appointment.provider?.join(', ')}</Box>
         </TableCell>
       )}
+
       <TableCell sx={{ verticalAlign: 'top' }}>
         {showChatIcon && (
           <IconButton
@@ -249,6 +249,7 @@ export function TrackingBoardTableRow({
           appointment={appointment}
           onClose={() => setChatModalOpen(false)}
           onMarkAllRead={() => setHasUnread(false)}
+          quickTexts={quickTexts}
         />
       )}
     </TableRow>

@@ -1,6 +1,6 @@
 {
   "name": "telemed-ehr-app",
-  "version": "0.13.0",
+  "version": "0.18.0",
   "private": true,
   "browserslist": {
     "production": [
@@ -30,14 +30,16 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "deploy:development": " PREFIX=development CLOUDFRONT_ID=E10TA6FN58D1OS ENV=development pnpm run ci-deploy-skeleton",
-    "ci-deploy-skeleton": "ENV=${ENV} VITE_APP_SHA=${GIT_HEAD:-$(git rev-parse --short HEAD)} VITE_APP_VERSION=$(node -pe 'require(\"./package.json\").version') pnpm run build:dev && aws s3 sync build/ s3://ehr.ottehr.com --region us-east-1 --delete && aws cloudfront create-invalidation --distribution-id ${CLOUDFRONT_ID} --paths '/*' --region us-east-1"
+    "deploy:production": " PREFIX=development CLOUDFRONT_ID=E10TA6FN58D1OS ENV=development pnpm run ci-deploy-skeleton",
+    "deploy:testing": " PREFIX=testing CLOUDFRONT_ID=ETFAEVC5V0490 ENV=testing pnpm run ci-deploy-skeleton",
+    "ci-deploy-skeleton": "ENV=${ENV} VITE_APP_SHA=${GIT_HEAD:-$(git rev-parse --short HEAD)} VITE_APP_VERSION=$(node -pe 'require(\"./package.json\").version') pnpm run build:${ENV} && aws s3 sync build/ s3://ehr.ottehr.com --region us-east-1 --delete && aws cloudfront create-invalidation --distribution-id ${CLOUDFRONT_ID} --paths '/*' --region us-east-1"
   },
   "dependencies": {
     "@mui/icons-material": "^5.14.9",
     "@mui/x-data-grid-pro": "^6.3.0",
     "@mui/x-date-pickers": "^5.0.20",
     "@mui/x-date-pickers-pro": "^5.0.20",
-    "@photonhealth/elements": "^0.12.7",
+    "@photonhealth/elements": "^0.13.0",
     "@twilio/conversations": "^2.4.1",
     "@zapehr/sdk": "1.0.15",
     "amazon-chime-sdk-component-library-react": "^3.7.0",

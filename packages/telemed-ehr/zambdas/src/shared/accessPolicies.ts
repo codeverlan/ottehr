@@ -7,6 +7,7 @@ export const ADMINISTRATOR_RULES = [
       'FHIR:Coverage',
       'FHIR:RelatedPerson',
       'FHIR:Organization',
+      'FHIR:Questionnaire',
       'FHIR:QuestionnaireResponse',
       'FHIR:DocumentReference',
       'FHIR:Person',
@@ -77,6 +78,7 @@ export const MANAGER_RULES = [
       'FHIR:Coverage',
       'FHIR:RelatedPerson',
       'FHIR:Organization',
+      'FHIR:Questionnaire',
       'FHIR:QuestionnaireResponse',
       'FHIR:DocumentReference',
       'FHIR:Person',
@@ -125,6 +127,7 @@ export const STAFF_RULES = [
       'FHIR:Organization',
       'FHIR:Location',
       'FHIR:Encounter',
+      'FHIR:Questionnaire',
       'FHIR:QuestionnaireResponse',
       'FHIR:DocumentReference',
       'FHIR:Person',
@@ -155,6 +158,7 @@ export const PROVIDER_RULES = [
       'FHIR:Organization',
       'FHIR:Location',
       'FHIR:Encounter',
+      'FHIR:Questionnaire',
       'FHIR:QuestionnaireResponse',
       'FHIR:DocumentReference',
       'FHIR:Person',
@@ -181,5 +185,34 @@ export const PROVIDER_RULES = [
     resource: 'Z3:*',
     action: 'Z3:GetObject',
     effect: 'Allow',
+  },
+];
+
+export const PRESCRIBER_RULES = [
+  {
+    action: ['FHIR:Search', 'FHIR:Read'],
+    effect: 'Allow',
+    resource: ['FHIR:AllergyIntolerance', 'FHIR:MedicationStatement'],
+  },
+
+  {
+    action: 'eRx:SearchMedication',
+    effect: 'Allow',
+    resource: 'eRx:Medication',
+  },
+  {
+    action: 'eRx:SearchAllergy',
+    effect: 'Allow',
+    resource: 'eRx:Allergy',
+  },
+  {
+    action: 'eRx:SyncPatient',
+    effect: 'Allow',
+    resource: 'eRx:Patient',
+  },
+  {
+    action: ['eRx:Create', 'eRx:Read'],
+    effect: 'Allow',
+    resource: 'eRx:Enrollment',
   },
 ];

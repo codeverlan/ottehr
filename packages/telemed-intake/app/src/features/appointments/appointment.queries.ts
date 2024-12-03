@@ -62,15 +62,26 @@ export const useCancelAppointmentMutation = () =>
       apiClient,
       appointmentID,
       cancellationReason,
+      appointmentType,
     }: {
       apiClient: ZapEHRAPIClient;
       appointmentID: string;
       cancellationReason: string;
+      appointmentType: 'telemedicine' | 'in-person';
     }) => {
-      return apiClient.cancelAppointment({
-        appointmentID,
-        cancellationReason,
-      });
+      if (appointmentType === 'telemedicine') {
+        return apiClient.cancelTelemedAppointment({
+          appointmentID,
+          cancellationReason,
+        });
+      } else if (appointmentType === 'in-person') {
+        return apiClient.cancelInPersonAppointment({
+          appointmentID,
+          cancellationReason,
+        });
+      } else {
+        throw new Error('Invalid appointment type');
+      }
     },
   });
 
@@ -90,7 +101,7 @@ export const useGetAppointments = (apiClient: ZapEHRAPIClient | null, enabled = 
       onError: (err) => {
         console.error('Error during fetching appointments: ', err);
       },
-      staleTime: 1000 * 60 * 5,
+      refetchOnMount: true,
     },
   );
 
